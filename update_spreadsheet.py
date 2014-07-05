@@ -68,13 +68,16 @@ class SimpleCRUD:
     self.curr_wksht_id = id_parts[len(id_parts) - 1]
     
   def _ListInsertAction(self, row_data):
-    entry = self.gd_client.InsertRow(self._StringToDictionary(row_data), 
-        self.curr_key, self.curr_wksht_id)
-    if isinstance(entry, gdata.spreadsheet.SpreadsheetsList):
-      return True
-    else:
+    try:
+      entry = self.gd_client.InsertRow(self._StringToDictionary(row_data), 
+          self.curr_key, self.curr_wksht_id)
+      if isinstance(entry, gdata.spreadsheet.SpreadsheetsList):
+        return True
+      else:
+        return False
+    except:
       return False
-        
+
   def _StringToDictionary(self, row_data):
     dict = {}
     for param in row_data.split():
