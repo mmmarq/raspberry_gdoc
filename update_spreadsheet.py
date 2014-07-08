@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-__author__ = 'api.laurabeth@gmail.com (Laura Beth Lincoln)'
+# Nased on script created by api.laurabeth@gmail.com (Laura Beth Lincoln)
+__author__ = 'marcelo.martim@gmail.com (Marcelo Martim Marques)'
 
 
 try:
