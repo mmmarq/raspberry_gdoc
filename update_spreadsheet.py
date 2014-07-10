@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Nased on script created by api.laurabeth@gmail.com (Laura Beth Lincoln)
+# Based on script created by api.laurabeth@gmail.com (Laura Beth Lincoln)
 __author__ = 'marcelo.martim@gmail.com (Marcelo Martim Marques)'
 
 
