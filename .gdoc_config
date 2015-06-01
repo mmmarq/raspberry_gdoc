@@ -1,3 +1,7 @@
-email=<E-MAIL ADDRESS>
-password=<PASSWORD>
-curr_key=<SPREADSHEET_KEY_IDENTIFIER-SEE_BROWSER_URL>
+credential_data=<cred.dat file full path> 
+json_cred=<client secrets json file full path -- https://console.developers.google.com/project>
+spreadsheet_id=<spreadsheet id from URL>
+worksheet_id= <worksheet id from https://spreadsheets.google.com/feeds/worksheets/YOUR_SPREADSHEET_ID/private/full>
+input_file=<data file full path>
+error_file=<error file full path>
+

@@ -22,89 +22,54 @@ try:
   from xml.etree import ElementTree
 except ImportError:
   from elementtree import ElementTree
-import gdata.spreadsheet.service
-import gdata.service
-import atom.service
-import gdata.spreadsheet
-import atom
 import getopt
 import sys
 import string
 import os
 import shutil
 
+# Do OAuth2 stuff to create credentials object
+import httplib2
+from oauth2client.file import Storage
+from oauth2client.client import flow_from_clientsecrets
+from oauth2client.tools import run
 
-class SimpleCRUD:
+# Use it within gdata
+import gdata.spreadsheet.service
+import gdata.gauth
 
-  def __init__(self, cf):
-    if not os.path.isfile(cf):
-      sys.exit(2)
+# get application credentials from google
+def getGdataCredentials(client_secrets="client_secrets.json", storedCreds="creds.dat", scope=["https://spreadsheets.google.com/feeds"], force=False):
+  storage = Storage(storedCreds)
+  credentials = storage.get()
+  if credentials is None or credentials.invalid or force:
+    credentials = run(flow_from_clientsecrets(client_secrets, scope=scope), storage)
+  if credentials.access_token_expired:
+    credentials.refresh(httplib2.Http())
+  return credentials
 
-    self.gd_client = gdata.spreadsheet.service.SpreadsheetsService()
+# get authorized spreadsheet client
+def getAuthorizedSpreadsheetClient(client_secrets="client_secrets.json", storedCreds="creds.dat", force=False):
+  credentials = getGdataCredentials(client_secrets=client_secrets, storedCreds=storedCreds, scope=["https://spreadsheets.google.com/feeds"], force = force)
+  client = gdata.spreadsheet.service.SpreadsheetsService(
+    additional_headers={'Authorization' : 'Bearer %s' % credentials.access_token})
+  return client
 
-    with open(cf) as f:
-      for line in f:
-        confdata = line.rstrip().split('=')
-        if len(confdata) != 2:
-          continue
-        if confdata[0] == "email":
-          self.gd_client.email = confdata[1]
-        elif confdata[0] == "password":
-          self.gd_client.password = confdata[1]
-        elif confdata[0] == "curr_key":
-          self.curr_key = confdata[1]
-
-    if self.gd_client.email == "" or self.gd_client.password == "" or self.curr_key == "":
-      print "Configuration file missing information!"
-      sys.exit(2)
-    self.gd_client.source = 'br.com.mmarq spreadsheet updater'
-    self.gd_client.ProgrammaticLogin()
-    self.list_feed = None
-    self.inputFile = "/media/2/log/local_data.log"
-    self.errorFile = "/media/2/log/error_local_data.log"
-    # Retrieve worksheet id
-    feed = self.gd_client.GetWorksheetsFeed(self.curr_key)
-    id_parts = feed.entry[2].id.text.split('/')
-    self.curr_wksht_id = id_parts[len(id_parts) - 1]
-    
-  def _ListInsertAction(self, row_data):
-    try:
-      entry = self.gd_client.InsertRow(self._StringToDictionary(row_data), 
-          self.curr_key, self.curr_wksht_id)
-      if isinstance(entry, gdata.spreadsheet.SpreadsheetsList):
-        return True
-      else:
-        return False
-    except:
-      return False
-
-  def _StringToDictionary(self, row_data):
-    dict = {}
-    for param in row_data.split():
-      temp = param.split('=')
-      dict[temp[0]] = temp[1]
-    return dict
-  
-  def Run(self):
-    if os.path.isfile(self.errorFile):
-      os.remove(self.errorFile)
-    e = open(self.errorFile, 'w')
-    
-    with open(self.inputFile) as f:
-      for line in f:
-        rawdata = line.split(',')
-        if len(rawdata) == 6:
-          data = "ano=" + rawdata[0] + " mes=" + rawdata[1] + " dia=" + rawdata[2] + " hora=" + rawdata[3] + " temperatura=" + rawdata[4] + " umidaderelativadoar=" + rawdata[5]
-          #print data
-          if not self._ListInsertAction(data):
-            e.write(line)
-      e.close()
-      os.remove(self.inputFile)
-      shutil.copy (self.errorFile,self.inputFile)
-      os.remove(self.errorFile)
-
+def stringToDictionary(raw_data):
+  rowData = {}
+  for param in raw_data.split():
+    temp = param.split('=')
+    rowData[temp[0]] = temp[1]
+  return rowData
 
 def main():
+  credential_data = ''
+  json_cred = ''
+  spreadsheet_id = ''
+  worksheet_id = ''
+  input_file = ''
+  error_file = ''
+  
   # parse command line options
   try:
     opts, args = getopt.getopt(sys.argv[1:], "", ["cf="])
@@ -121,10 +86,57 @@ def main():
   if cf == '':
     print 'python update_spreadsheet.py --cf [configuration_file]'
     sys.exit(2)
-        
-  sample = SimpleCRUD(cf)
-  sample.Run()
 
+  with open(cf) as f:
+    for line in f:
+      confdata = line.rstrip().split('=')
+      if len(confdata) != 2:
+        continue
+      if confdata[0] == "credential_data":
+        credential_data = confdata[1]
+      elif confdata[0] == "json_cred":
+        json_cred = confdata[1]
+      elif confdata[0] == "spreadsheet_id":
+        spreadsheet_id = confdata[1]
+      elif confdata[0] == "worksheet_id":
+        worksheet_id = confdata[1]
+      elif confdata[0] == "input_file":
+        input_file = confdata[1]
+      elif confdata[0] == "error_file":
+        error_file = confdata[1]
+
+  # check configuration data
+  if (credential_data == '') or (json_cred == '') or (spreadsheet_id == '') or (worksheet_id == '') or (input_file == '') or (error_file == ''):
+    print 'Unable to read all required values from configuration file'
+    sys.exit(2)
+
+  # google authentication
+  storage = Storage(credential_data)
+  credentials = storage.get()
+  if credentials is None or credentials.invalid:
+    credentials = run(flow_from_clientsecrets(json_cred, scope=["https://spreadsheets.google.com/feeds"]), storage)
+
+  # get authorized client
+  gd_client = getAuthorizedSpreadsheetClient(json_cred,credential_data)
+
+  if os.path.isfile(error_file):
+    os.remove(error_file)
+  e = open(error_file, 'w')
+  
+  with open(input_file) as f:
+    for line in f:
+      rawdata = line.split(',')
+      if len(rawdata) == 6:
+        rowData = stringToDictionary("ano=" + rawdata[0] + " mes=" + rawdata[1] + " dia=" + rawdata[2] + " hora=" + rawdata[3] + " temperatura=" + rawdata[4] + " umidaderelativadoar=" + rawdata[5])
+        entry = gd_client.InsertRow(rowData, spreadsheet_id, worksheet_id)
+
+        if not isinstance(entry, gdata.spreadsheet.SpreadsheetsList):
+          e.write(line)
+
+    e.close()
+    os.remove(input_file)
+    shutil.copy (error_file,input_file)
+    os.remove(error_file)
 
 if __name__ == '__main__':
   main()
