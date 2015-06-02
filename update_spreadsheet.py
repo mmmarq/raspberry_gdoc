@@ -114,7 +114,7 @@ def main():
   storage = Storage(credential_data)
   credentials = storage.get()
   if credentials is None or credentials.invalid:
-    credentials = run(flow_from_clientsecrets(json_cred, scope=["https://spreadsheets.google.com/feeds"]), storage)
+    credentials = run(flow_from_clientsecrets(json_cred, "https://spreadsheets.google.com/feeds"), storage)
 
   # get authorized client
   gd_client = getAuthorizedSpreadsheetClient(json_cred,credential_data)
